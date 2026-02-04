@@ -36,6 +36,10 @@ jobs:
             postgresql:
               auth:
                 password: $(openssl rand -base64 32)
+            redis:
+              auth:
+                enabled: true
+                password: $(openssl rand -base64 32)
             worker:
               env:
                 WORKERS_COUNT: 1
