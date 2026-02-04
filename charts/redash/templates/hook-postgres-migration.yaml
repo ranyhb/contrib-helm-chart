@@ -89,9 +89,9 @@ spec:
           mountPath: /tmp
       volumes:
       - name: migration-storage
-        {{- if .Values.postgresqlMigration.storage }}
+        {{- if .Values.postgresqlMigration.storage.pvcName }}
         persistentVolumeClaim:
-          claimName: {{ .Values.postgresqlMigration.storage.pvcName | default (printf "%s-postgres-migration" .Release.Name) }}
+          claimName: {{ .Values.postgresqlMigration.storage.pvcName }}
         {{- else }}
         emptyDir: {}
         {{- end }}
