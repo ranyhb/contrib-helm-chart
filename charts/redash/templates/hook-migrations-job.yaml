@@ -54,26 +54,9 @@ spec:
             {{- if .Values.postgresql.enabled }}
             export REDASH_DATABASE_URL="postgresql://${REDASH_DATABASE_USER}:${REDASH_DATABASE_PASSWORD}@${REDASH_DATABASE_HOSTNAME}:${REDASH_DATABASE_PORT}/${REDASH_DATABASE_NAME}"
             {{- end }}
-            # Step 1: Apply existing pending migrations
-            /app/manage.py db upgrade
-            # Step 2: Detect schema differences and generate migration files if needed
-            # This is especially important when copying an existing database
-            /app/manage.py db migrate || true
-            # Step 3: Apply any newly generated migrations (if migrate created a migration file)
-            # If no migration was generated, this will simply report "no migrations to apply"
-            /app/manage.py db upgrade
+            exec /app/bin/docker-entrypoint create_db
         {{- else }}
-          - /bin/sh
-          - -c
-          - |
-            # Step 1: Apply existing pending migrations
-            /app/manage.py db upgrade
-            # Step 2: Detect schema differences and generate migration files if needed
-            # This is especially important when copying an existing database
-            /app/manage.py db migrate || true
-            # Step 3: Apply any newly generated migrations (if migrate created a migration file)
-            # If no migration was generated, this will simply report "no migrations to apply"
-            /app/manage.py db upgrade
+          - create_db
         {{- end }}
         env:
         {{- $envCtx := mergeOverwrite (deepCopy .) (dict "Values" (dict "env" .Values.migrations.env)) -}}
