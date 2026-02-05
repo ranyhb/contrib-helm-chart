@@ -16,7 +16,7 @@ jobs:
           - v1.34
     runs-on: ubuntu-22.04
     steps:
-      - uses: medyagh/setup-minikube@v0.0.16
+      - uses: medyagh/setup-minikube@v0.0.21
         with:
           kubernetes-version: ${{ matrix.k8s }}
       - uses: actions/checkout@v4
