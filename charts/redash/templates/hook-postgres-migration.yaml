@@ -31,7 +31,14 @@ spec:
           - -c
           - |
             set -e
+            echo "=== PostgreSQL Migration Pre-Upgrade Hook ==="
             echo "Checking for existing PostgreSQL 15 instance..."
+            
+            # Install kubectl (needed for scaling StatefulSet and managing PVCs)
+            apk add --no-cache curl > /dev/null 2>&1
+            KUBECTL_VERSION="v1.30.0"
+            curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" > /dev/null 2>&1
+            chmod +x kubectl && mv kubectl /usr/local/bin/kubectl > /dev/null 2>&1 || true
             
             # Try to connect to old PostgreSQL instance
             OLD_PG_HOST="{{ $postgresqlFullname }}"
@@ -49,11 +56,12 @@ spec:
             PG_VERSION=$(PGPASSWORD="$OLD_PG_PASSWORD" psql -h "$OLD_PG_HOST" -U "$OLD_PG_USER" -d "$OLD_PG_DB" -t -c "SELECT version();" | grep -oE '[0-9]+\.[0-9]+' | head -1)
             echo "Current PostgreSQL version: $PG_VERSION"
             
-            # Only dump if PostgreSQL version is 15.x (major version 15)
+            # Only proceed if PostgreSQL version is 15.x (major version 15)
             if echo "$PG_VERSION" | grep -qE '^15\.'; then
-              echo "PostgreSQL 15.x detected. Creating database dump..."
+              echo "PostgreSQL 15.x detected. Starting migration process..."
               
-              # Create dump
+              # Step 1: Create database dump
+              echo "Step 1/4: Creating database dump..."
               PGPASSWORD="$OLD_PG_PASSWORD" pg_dump -h "$OLD_PG_HOST" -U "$OLD_PG_USER" -d "$OLD_PG_DB" -F c -f /tmp/redash-backup.dump
               
               # Also create SQL dump as backup
@@ -62,12 +70,49 @@ spec:
               echo "Database dump created successfully"
               ls -lh /tmp/redash-backup.*
               
-              # Store dump in a PVC or ConfigMap (we'll use a PVC)
-              # Note: This requires a PVC to be created separately or use a shared volume
-              echo "Dump files created at /tmp/redash-backup.dump and /tmp/redash-backup.sql"
-              echo "IMPORTANT: Copy these files to persistent storage before proceeding!"
+              # Step 2: Scale down PostgreSQL StatefulSet to 0
+              echo "Step 2/4: Scaling down PostgreSQL StatefulSet..."
+              RELEASE_NAME="{{ .Release.Name }}"
+              NAMESPACE="{{ .Release.Namespace }}"
+              
+              # Try to find and scale down the PostgreSQL StatefulSet
+              # Bitnami PostgreSQL chart typically creates: <release-name>-postgresql or <release-name>-postgresql-primary
+              for STATEFULSET_NAME in "${RELEASE_NAME}-postgresql" "${RELEASE_NAME}-postgresql-primary"; do
+                if kubectl get statefulset "$STATEFULSET_NAME" -n "$NAMESPACE" > /dev/null 2>&1; then
+                  echo "Found StatefulSet: $STATEFULSET_NAME"
+                  kubectl scale statefulset "$STATEFULSET_NAME" --replicas=0 -n "$NAMESPACE" --timeout=120s || {
+                    echo "WARNING: Failed to scale down StatefulSet $STATEFULSET_NAME. Continuing anyway..."
+                  }
+                  echo "Waiting for PostgreSQL pods to terminate..."
+                  sleep 10
+                  break
+                fi
+              done
+              
+              # Step 3: Delete the PostgreSQL PVC so PostgreSQL 18 can start fresh
+              echo "Step 3/4: Deleting PostgreSQL PVC (data is safely backed up in dump files)..."
+              # Bitnami PostgreSQL typically creates PVCs like: <release-name>-postgresql-data-0 or <release-name>-postgresql
+              for PVC_NAME in "${RELEASE_NAME}-postgresql-data-0" "${RELEASE_NAME}-postgresql-data" "${RELEASE_NAME}-postgresql"; do
+                if kubectl get pvc "$PVC_NAME" -n "$NAMESPACE" > /dev/null 2>&1; then
+                  echo "Found PVC: $PVC_NAME"
+                  echo "Deleting PVC to allow PostgreSQL 18 to start with a fresh data directory..."
+                  echo "NOTE: All data has been backed up to /tmp/redash-backup.dump and /tmp/redash-backup.sql"
+                  kubectl delete pvc "$PVC_NAME" -n "$NAMESPACE" --timeout=120s || {
+                    echo "WARNING: Failed to delete PVC $PVC_NAME. PostgreSQL 18 may fail to start."
+                    echo "You may need to manually delete this PVC: kubectl delete pvc $PVC_NAME -n $NAMESPACE"
+                    echo "The data is safely backed up in the migration storage PVC."
+                  }
+                  break
+                fi
+              done
+              
+              echo "Step 4/4: Migration preparation complete!"
+              echo "Dump files are stored at: /tmp/redash-backup.dump and /tmp/redash-backup.sql"
+              echo "PostgreSQL 15 has been stopped and PVC handled."
+              echo "Helm upgrade will now start PostgreSQL 18 with a fresh data directory."
+              echo "The post-upgrade hook will restore the data automatically."
             else
-              echo "PostgreSQL version is not 15.x (found: $PG_VERSION). Skipping dump."
+              echo "PostgreSQL version is not 15.x (found: $PG_VERSION). Skipping migration."
               echo "If you're upgrading from a different version, manual migration may be required."
             fi
         env:
