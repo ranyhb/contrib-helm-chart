@@ -25,9 +25,11 @@ jobs:
       - uses: azure/setup-helm@v4
       - name: testing helm chart
         run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo update
           cd charts/redash
-          helm lint .
           helm dependency build .
+          helm lint .
           cat > test-values.yaml <<- EOM
             redash:
               cookieSecret: $(openssl rand -base64 32)
