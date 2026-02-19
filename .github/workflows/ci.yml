@@ -5,16 +5,17 @@ on:
   pull_request:
 jobs:
   test-on-minikube:
+    timeout-minutes: 45
     strategy:
       matrix:
         k8s: 
-          - v1.26
-          - v1.27
-          - v1.28
-          - v1.29
+          - v1.31
+          - v1.32
+          - v1.33
+          - v1.34
     runs-on: ubuntu-22.04
     steps:
-      - uses: medyagh/setup-minikube@v0.0.16
+      - uses: medyagh/setup-minikube@v0.0.21
         with:
           kubernetes-version: ${{ matrix.k8s }}
       - uses: actions/checkout@v4
@@ -23,9 +24,11 @@ jobs:
       - uses: azure/setup-helm@v4
       - name: testing helm chart
         run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo update
           cd charts/redash
-          helm lint .
           helm dependency build .
+          helm lint .
           cat > test-values.yaml <<- EOM
             redash:
               cookieSecret: $(openssl rand -base64 32)
@@ -35,20 +38,24 @@ jobs:
             postgresql:
               auth:
                 password: $(openssl rand -base64 32)
+            redis:
+              auth:
+                enabled: true
+                password: $(openssl rand -base64 32)
             worker:
               env:
                 WORKERS_COUNT: 1
           EOM
-          helm upgrade --install redash . --wait -f test-values.yaml
+          helm upgrade --install redash . --wait --timeout 10m -f test-values.yaml
           sleep 10
           helm test redash
           helm delete redash
-          helm upgrade --install redashup . --wait -f test-values.yaml
+          helm upgrade --install redashup . --wait --timeout 10m -f test-values.yaml
           kubectl get pod -l "app.kubernetes.io/instance=redashup,app.kubernetes.io/component=server" -o jsonpath="{..image}"
           sleep 10
           helm test redashup
           kubectl delete pod -l "app.kubernetes.io/instance=redashup,app.kubernetes.io/component=test-connection"
-          helm upgrade --install redashup . --wait --reset-values -f test-values.yaml
+          helm upgrade --install redashup . --wait --reset-values --timeout 10m -f test-values.yaml
           kubectl get pod -l "app.kubernetes.io/instance=redashup,app.kubernetes.io/component=server" -o jsonpath="{..image}"
           sleep 10
           helm test redashup

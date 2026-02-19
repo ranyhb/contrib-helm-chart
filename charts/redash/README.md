@@ -8,14 +8,14 @@ This chart bootstraps a [Redash](https://github.com/getredash/redash) deployment
 
 This is a contributed project developed by volunteers and not officially supported by Redash.
 
-Current chart version is `3.1.0-alpha6`
+Current chart version is `3.2.0`
 
 * <https://github.com/getredash/redash>
 
 ## Prerequisites
 
 - At least 3 GB of RAM available on your cluster
-- Kubernetes 1.19+ - chart is tested with latest 3 stable versions
+- Kubernetes 1.31+ - chart is tested with latest 4 stable versions (1.31-1.34)
 - Helm 3 (Helm 2 depreciated)
 - PV provisioner support in the underlying infrastructure
 
@@ -67,8 +67,8 @@ The command removes all the Kubernetes components associated with the chart and 
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://registry-1.docker.io/bitnamicharts | postgresql | ^15.2.0 |
-| oci://registry-1.docker.io/bitnamicharts | redis | ^19.1.0 |
+| https://charts.bitnami.com/bitnami | postgresql | ^18.2.0 |
+| https://charts.bitnami.com/bitnami | redis | ^24.1.0 |
 
 ## Configuration
 
@@ -78,6 +78,7 @@ The following table lists the configurable parameters of the Redash chart and th
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| commonLabels | object | `{}` |  |
 | env | object | `{"PYTHONUNBUFFERED":0,"REDASH_PRODUCTION":"true"}` | Redash global environment variables - applied to both server and worker containers. |
 | externalPostgreSQL | string | `nil` | External PostgreSQL configuration. To use an external PostgreSQL instead of the automatically deployed postgresql chart: set postgresql.enabled to false then uncomment and configure the externalPostgreSQL connection URL (e.g. postgresql://user:pass@host:5432/database) |
 | externalPostgreSQLSecret | object | `{}` | Read external PostgreSQL configuration from a secret. This should point at a secret file with a single key which specifies the connection string. |
@@ -87,7 +88,7 @@ The following table lists the configurable parameters of the Redash chart and th
 | fullnameOverride | string | `""` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.registry | string | `"docker.io"` |  |
-| image.repo | string | `"redash/preview"` | Redash image name used for server and worker pods |
+| image.repo | string | `"redash/redash"` | Redash image name used for server and worker pods |
 | image.tag | string | `nil` | Redash image [tag](https://hub.docker.com/r/redash/redash/tags) |
 | imagePullSecrets | list | `[]` | Name(s) of secrets to use if pulling images from a private registry |
 | ingress.annotations | object | `{}` | Ingress annotations configuration |
@@ -101,7 +102,9 @@ The following table lists the configurable parameters of the Redash chart and th
 | migrations.initContainers | list | `[]` | migrations init container configuration |
 | migrations.nodeSelector | object | `{}` | Node labels for scheduled worker pod assignment [ref](https://kubernetes.io/docs/user-guide/node-selection/) |
 | migrations.podAnnotations | object | `{}` | Annotations for scheduled worker pod assignment [ref](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/) |
+| migrations.podLabels | object | `{}` | Labels for migration pod [ref](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) |
 | migrations.podSecurityContext | object | `{}` | Security contexts for scheduled worker pod assignment [ref](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) |
+| migrations.priorityClassName | string | `nil` |  |
 | migrations.resources | string | `nil` | Scheduled worker resource requests and limits [ref](http://kubernetes.io/docs/user-guide/compute-resources/) |
 | migrations.securityContext | object | `{}` |  |
 | migrations.tolerations | list | `[]` | Tolerations for server pod assignment [ref](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) |
@@ -114,6 +117,9 @@ The following table lists the configurable parameters of the Redash chart and th
 | postgresql.auth.username | string | `"redash"` | PostgreSQL username for redash user (when postgresql chart enabled) |
 | postgresql.enabled | bool | `true` | Whether to deploy a PostgreSQL server to satisfy the applications database requirements. To use an external PostgreSQL set this to false and configure the externalPostgreSQL parameter. |
 | postgresql.primary.service.ports.postgresql | int | `5432` |  |
+| postgresqlMigration.enabled | bool | `false` | Enable automatic PostgreSQL migration hooks for major version upgrades (e.g., 15→18).  WARNING: Requires a PVC to be created beforehand for storing the dump between pre-upgrade and post-upgrade hooks. Create a PVC: kubectl create -f - <<EOF apiVersion: v1 kind: PersistentVolumeClaim metadata:   name: <release-name>-postgres-migration spec:   accessModes: [ReadWriteOnce]   resources:     requests:       storage: 10Gi EOF Then set postgresqlMigration.storage.pvcName to the PVC name. |
+| postgresqlMigration.storage | object | `{"pvcName":""}` | Storage configuration for migration dumps |
+| postgresqlMigration.storage.pvcName | string | `""` | REQUIRED: Name of existing PVC to use for storing migration dumps.  The PVC must exist before running the upgrade. Both pre-upgrade (dump) and post-upgrade (restore) hooks use this PVC. If not set, uses emptyDir which will NOT persist between hooks (migration will fail). |
 | redash.additionalDestinations | string | `""` | `REDASH_ADDITIONAL_DESTINATIONS` value. Comma-separated list of non-default alert destinations to be enabled. |
 | redash.additionalQueryRunners | string | `""` | `REDASH_ADDITIONAL_QUERY_RUNNERS` value. Comma-separated list of non-default query runners to be enabled. |
 | redash.adhocQueryTimeLimit | string | None | `REDASH_ADHOC_QUERY_TIME_LIMIT` value. Time limit for adhoc queries (in seconds). |
@@ -212,6 +218,7 @@ The following table lists the configurable parameters of the Redash chart and th
 | scheduler.podAnnotations | object | `{}` | Annotations for scheduler pod assignment [ref](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/) |
 | scheduler.podLabels | object | `{}` | Labels for scheduler pod assignment [ref](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) |
 | scheduler.podSecurityContext | object | `{}` | Security contexts for scheduler pod assignment [ref](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) |
+| scheduler.priorityClassName | string | `nil` |  |
 | scheduler.replicaCount | int | `1` | Number of scheduler pods to run |
 | scheduler.resources | string | `nil` | scheduler resource requests and limits [ref](http://kubernetes.io/docs/user-guide/compute-resources/) |
 | scheduler.securityContext | object | `{}` |  |
@@ -227,6 +234,7 @@ The following table lists the configurable parameters of the Redash chart and th
 | server.podAnnotations | object | `{}` | Annotations for server pod assignment [ref](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/) |
 | server.podLabels | object | `{}` | Labels for server pod assignment [ref](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) |
 | server.podSecurityContext | object | `{}` | Security contexts for server pod assignment [ref](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) |
+| server.priorityClassName | string | `nil` |  |
 | server.readinessProbe | object | `{"failureThreshold":3,"initialDelaySeconds":10,"periodSeconds":10,"successThreshold":1,"timeoutSeconds":1}` | Server readiness probe configuration  |
 | server.replicaCount | int | `1` | Number of server pods to run |
 | server.resources | object | `{}` | Server resource requests and limits [ref](http://kubernetes.io/docs/user-guide/compute-resources/) |
@@ -251,6 +259,7 @@ The following table lists the configurable parameters of the Redash chart and th
 | worker.podAnnotations | object | `{}` | Default annotations for worker pod assignment [ref](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/) |
 | worker.podLabels | object | `{}` | Default labels for worker pod assignment [ref](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) |
 | worker.podSecurityContext | object | `{}` | Default worker's security context pod assignment [ref](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) |
+| worker.priorityClassName | string | `nil` |  |
 | worker.replicaCount | int | `1` | Default number of worker pods to run |
 | worker.resources | string | `nil` | Worker default resource requests and limits [ref](http://kubernetes.io/docs/user-guide/compute-resources/) |
 | worker.securityContext | object | `{}` |  |
@@ -287,6 +296,91 @@ Below are notes on manual configuration changes or steps needed for major chart 
   - default config for all workers is at `worker` section
 - replaced `hookInstallJob` and `hookUpgradeJob` with `migrations`
 - Moved custom entrypoint scripts to [Redash repo](https://github.com/getredash/redash/pull/6674)
+
+### From 3.1 to 3.2
+
+**CRITICAL: PostgreSQL Major Version Upgrade (15→18)**
+
+This upgrade includes a PostgreSQL major version upgrade from 15 to 18. **PostgreSQL major versions are NOT data-directory compatible** - PostgreSQL 18 cannot read PostgreSQL 15 data directly.
+
+**Two upgrade options:**
+
+#### Option 1: Automatic Migration (Recommended)
+
+Enable automatic migration hooks:
+
+1. **Create a PVC for migration storage** (required):
+   ```bash
+   kubectl create -f - <<EOF
+   apiVersion: v1
+   kind: PersistentVolumeClaim
+   metadata:
+     name: <release-name>-postgres-migration
+   spec:
+     accessModes: [ReadWriteOnce]
+     resources:
+       requests:
+         storage: 10Gi
+   EOF
+   ```
+
+2. **Enable migration hooks** in your values:
+   ```yaml
+   postgresqlMigration:
+     enabled: true
+     storage:
+       pvcName: <release-name>-postgres-migration
+   ```
+
+3. **Upgrade**:
+   ```bash
+   helm upgrade --reuse-values <release-name> redash/redash
+   ```
+
+**What happens automatically:**
+- Pre-upgrade hook: Dumps PostgreSQL 15 data to the migration PVC
+- Pre-upgrade hook: Scales down PostgreSQL 15 StatefulSet
+- Pre-upgrade hook: Deletes the old PostgreSQL 15 PVC (data is safely backed up)
+- Helm upgrade: Starts PostgreSQL 18 with a fresh data directory
+- Post-upgrade hook: Restores data from dump files to PostgreSQL 18
+
+**Important Notes:**
+- The service account needs RBAC permissions (automatically created when `postgresqlMigration.enabled: true`)
+- Ensure the migration PVC has sufficient storage (at least 2x your database size)
+- The old PostgreSQL 15 PVC will be **deleted** - all data must be in the dump files
+- Test in a staging environment first!
+
+#### Option 2: Manual Migration
+
+If you prefer manual control:
+
+1. **Dump the database**:
+   ```bash
+   kubectl exec -it <release-name>-postgresql-0 -- pg_dump -U redash -d redash -F c -f /tmp/redash-backup.dump
+   kubectl cp <release-name>-postgresql-0:/tmp/redash-backup.dump ./redash-backup.dump
+   ```
+
+2. **Delete the PostgreSQL StatefulSet and PVC**:
+   ```bash
+   kubectl scale statefulset <release-name>-postgresql --replicas=0
+   kubectl delete pvc <release-name>-postgresql-data-0  # or appropriate PVC name
+   ```
+
+3. **Upgrade the chart** (PostgreSQL 18 will start fresh):
+   ```bash
+   helm upgrade --reuse-values <release-name> redash/redash
+   ```
+
+4. **Wait for PostgreSQL 18 to be ready**, then restore:
+   ```bash
+   kubectl cp ./redash-backup.dump <release-name>-postgresql-0:/tmp/redash-backup.dump
+   kubectl exec -it <release-name>-postgresql-0 -- pg_restore -U redash -d redash -v --no-owner --no-privileges /tmp/redash-backup.dump
+   ```
+
+**Other changes:**
+- Redash upgraded from v24.04.0-dev to v25.8.0 (latest stable)
+- Redis dependency upgraded from ^19.1.0 to ^24.1.0
+- Kubernetes compatibility: 1.31+ (removed support for 1.26-1.30)
 
 ### From 2.x to 3.x
 

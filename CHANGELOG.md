@@ -1,5 +1,27 @@
 # Changelog
 
+## 3.2.0
+
+- Upgrade Redash from v24.04.0-dev to v25.8.0 (latest stable)
+- Update default image repository from `redash/preview` to `redash/redash` for stable releases
+- Upgrade PostgreSQL dependency from ^15.2.0 to ^18.2.0 (latest: 18.2.4)
+- Upgrade Redis dependency from ^19.1.0 to ^24.1.0 (latest: 24.1.3)
+- **NEW**: Added optional automatic PostgreSQL migration hooks for major version upgrades (15→18)
+  - Enable with `postgresqlMigration.enabled: true` and configure a PVC for storage
+  - See [README](charts/redash/README.md#upgrading) for details
+- See upgrade notes in [README](charts/redash/README.md#upgrading)
+
+**CRITICAL Upgrade Notes:**
+- **Always backup your PostgreSQL database before upgrading**
+- **Redash schema migrations** will run automatically via Helm hooks (handles Redash app schema changes)
+- **PostgreSQL version upgrade (15→18)**:
+  - **Option 1**: Enable automatic migration hooks (requires PVC) - see README
+  - **Option 2**: Manual migration using `pg_dump`/`pg_restore` - see README
+- PostgreSQL 15 → 18 is a major version jump requiring data migration
+- Redis 19 → 24 upgrade should be automatic, but test thoroughly
+- Test in staging environment first, especially if upgrading from v24.x
+- Review Bitnami PostgreSQL and Redis chart changelogs for breaking changes
+
 ## 3.0.1 (unreleased)
 
 - Change scheduler deployment strategy type to Recreate. (#121)
