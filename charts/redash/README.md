@@ -15,7 +15,7 @@ Current chart version is `3.2.0`
 ## Prerequisites
 
 - At least 3 GB of RAM available on your cluster
-- Kubernetes 1.30+ - chart is tested with latest 5 stable versions (1.30-1.34)
+- Kubernetes 1.31+ - chart is tested with latest 4 stable versions (1.31-1.34)
 - Helm 3 (Helm 2 depreciated)
 - PV provisioner support in the underlying infrastructure
 
@@ -380,7 +380,7 @@ If you prefer manual control:
 **Other changes:**
 - Redash upgraded from v24.04.0-dev to v25.8.0 (latest stable)
 - Redis dependency upgraded from ^19.1.0 to ^24.1.0
-- Kubernetes compatibility: 1.30+ (removed support for 1.26-1.29)
+- Kubernetes compatibility: 1.31+ (removed support for 1.26-1.30)
 
 ### From 2.x to 3.x
 
